@@ -19,6 +19,9 @@ if (savedKey) {
     apiKeyInput.value = savedKey;
 }
 
+// Vérifier la santé du serveur au démarrage
+checkServerHealth();
+
 // Event Listeners
 sendBtn.addEventListener('click', sendMessage);
 messageInput.addEventListener('keypress', (e) => {
@@ -38,7 +41,7 @@ saveSettings.addEventListener('click', () => {
     if (key) {
         localStorage.setItem('apifreellm_key', key);
         settingsModal.style.display = 'none';
-        showNotification('Clé API sauvegardée !');
+        showNotification('Clé API sauvegardée localement !');
     }
 });
 
@@ -48,6 +51,20 @@ settingsModal.addEventListener('click', (e) => {
         settingsModal.style.display = 'none';
     }
 });
+
+async function checkServerHealth() {
+    try {
+        const response = await fetch('/health');
+        const data = await response.json();
+        console.log('🩺 Santé du serveur:', data);
+        
+        if (!data.apiKeyConfigured) {
+            showNotification('⚠️ Clé API non configurée sur le serveur', 'warning');
+        }
+    } catch (error) {
+        console.error('❌ Impossible de contacter le serveur:', error);
+    }
+}
 
 async function sendMessage() {
     const message = messageInput.value.trim();
@@ -65,7 +82,7 @@ async function sendMessage() {
     setLoading(true);
 
     try {
-        const apiKey = localStorage.getItem('apifreellm_key') || '';
+        console.log('📤 Envoi de la requête au serveur...');
         
         const response = await fetch('/api/chat', {
             method: 'POST',
@@ -79,20 +96,33 @@ async function sendMessage() {
         });
 
         const data = await response.json();
+        console.log('📥 Réponse du serveur:', data);
 
-        if (!response.ok) {
-            throw new Error(data.error || 'Erreur lors de la requête');
+        if (!response.ok || !data.success) {
+            // Construire un message d'erreur détaillé
+            let errorMsg = data.message || data.error || 'Erreur inconnue';
+            
+            if (data.status === 401) {
+                errorMsg += '\n\n💡 Solution: Vérifiez que la variable d\'environnement APIFREELLM_KEY est bien configurée dans Render.com avec votre clé API valide.';
+            } else if (data.status === 429) {
+                errorMsg += '\n\n⏳ Attendez 5 secondes avant de réessayer.';
+            } else if (!data.apiKeyConfigured) {
+                errorMsg += '\n\n🔧 Le serveur n\'a pas de clé API configurée.';
+            }
+            
+            throw new Error(errorMsg);
         }
 
         // Ajouter la réponse du bot
-        if (data.success) {
+        if (data.response) {
             addMessage(data.response, 'bot');
         } else {
-            throw new Error('Réponse invalide');
+            throw new Error('Réponse vide de l\'API');
         }
 
     } catch (error) {
-        addMessage(`❌ Erreur : ${error.message}`, 'bot');
+        console.error('❌ Erreur complète:', error);
+        addMessage(`❌ **Erreur:**\n${error.message}`, 'bot');
     } finally {
         setLoading(false);
     }
@@ -107,7 +137,8 @@ function addMessage(text, sender) {
     header.textContent = sender === 'user' ? 'Vous' : 'Koussossou';
     
     const content = document.createElement('div');
-    content.textContent = text;
+    // Gérer les sauts de ligne
+    content.innerHTML = text.replace(/\n/g, '<br>');
     
     messageDiv.appendChild(header);
     messageDiv.appendChild(content);
@@ -123,7 +154,7 @@ function setLoading(loading) {
     if (loading) {
         progressContainer.style.display = 'flex';
         sendBtn.classList.add('loading');
-        sendBtn.innerHTML = '<span class="loader">⏳</span>';
+        sendBtn.innerHTML = '<span style="font-size: 18px;">⏳</span>';
         messageInput.disabled = true;
     } else {
         progressContainer.style.display = 'none';
@@ -139,25 +170,33 @@ function setLoading(loading) {
     }
 }
 
-function showNotification(text) {
+function showNotification(text, type = 'success') {
     const notif = document.createElement('div');
+    const bgColor = type === 'warning' ? '#f59e0b' : '#10b981';
+    
     notif.style.cssText = `
         position: fixed;
         top: 100px;
         left: 50%;
         transform: translateX(-50%);
-        background: var(--success);
+        background: ${bgColor};
         color: white;
-        padding: 12px 24px;
-        border-radius: 10px;
+        padding: 16px 24px;
+        border-radius: 12px;
         font-weight: 500;
         z-index: 3000;
         animation: slideDown 0.3s ease;
+        max-width: 90%;
+        text-align: center;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
     `;
     notif.textContent = text;
     document.body.appendChild(notif);
     
     setTimeout(() => {
-        notif.remove();
-    }, 3000);
+        notif.style.opacity = '0';
+        notif.style.transform = 'translateX(-50%) translateY(-20px)';
+        notif.style.transition = 'all 0.3s ease';
+        setTimeout(() => notif.remove(), 300);
+    }, 5000);
 }
