@@ -22,31 +22,18 @@ app.post("/api/chat", async (req, res) => {
       return res.json({ reply: "Veuillez poser une question." });
     }
 
-    const response = await puter.ai.chat({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: "Tu es Kousossou, un assistant intelligent, poli et clair."
-        },
-        {
-          role: "user",
-          content: message
-        }
-      ]
+    // ✅ MÉTHODE CORRECTE POUR PUTER (SERVEUR)
+    const response = await puter.ai.complete({
+      prompt: `Tu es Kousossou, un assistant intelligent et poli.\n\nUtilisateur : ${message}\nAssistant :`,
+      model: "gpt-4o-mini"
     });
 
-    // 🔥 EXTRACTION SÉCURISÉE (ANTI undefined)
-    let reply =
-      response?.message?.content ||
-      response?.output_text ||
-      response?.messages?.[0]?.content ||
-      "Je n’ai pas pu générer de réponse.";
+    const reply = response?.text || "Aucune réponse générée.";
 
     res.json({ reply });
 
   } catch (error) {
-    console.error("❌ Erreur IA complète :", error);
+    console.error("❌ Erreur Puter :", error);
     res.status(500).json({
       reply: "Erreur interne de l’assistant."
     });
