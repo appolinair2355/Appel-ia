@@ -4,11 +4,12 @@ async function send() {
   const bar = document.getElementById("progress");
   const fill = document.getElementById("progress-fill");
 
+  if (!msg) return;
+
   rep.innerText = "";
   bar.style.display = "block";
   fill.style.width = "0%";
 
-  // animation de chargement
   let percent = 0;
   const loader = setInterval(() => {
     percent += 5;
@@ -28,21 +29,5 @@ async function send() {
   setTimeout(() => {
     bar.style.display = "none";
     rep.innerText = data.reply;
-  }, 500);
-}
-```js
-async function send() {
-  const msg = document.getElementById("msg").value;
-  const rep = document.getElementById("rep");
-
-  rep.innerText = "⏳ Réflexion...";
-
-  const res = await fetch("/api/chat", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message: msg })
-  });
-
-  const data = await res.json();
-  rep.innerText = data.reply;
+  }, 400);
 }
