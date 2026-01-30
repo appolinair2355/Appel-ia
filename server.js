@@ -12,8 +12,6 @@ const PORT = 10000;
 
 app.use(cors());
 app.use(express.json());
-
-// ⚠️ Sert SEULEMENT le dossier public (pas de app.get("/"))
 app.use(express.static(path.join(__dirname, "public")));
 
 app.post("/api/chat", async (req, res) => {
@@ -38,11 +36,20 @@ app.post("/api/chat", async (req, res) => {
       ]
     });
 
-    res.json({ reply: response.message.content });
+    // 🔥 EXTRACTION SÉCURISÉE (ANTI undefined)
+    let reply =
+      response?.message?.content ||
+      response?.output_text ||
+      response?.messages?.[0]?.content ||
+      "Je n’ai pas pu générer de réponse.";
+
+    res.json({ reply });
 
   } catch (error) {
-    console.error("Erreur IA:", error);
-    res.status(500).json({ reply: "Erreur lors de la réponse de l’assistant." });
+    console.error("❌ Erreur IA complète :", error);
+    res.status(500).json({
+      reply: "Erreur interne de l’assistant."
+    });
   }
 });
 
