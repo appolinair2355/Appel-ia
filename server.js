@@ -7,128 +7,134 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-// Middleware
+// ================================
+// CONFIG API
+// ================================
+const API_KEY = process.env.APIFREELLM_KEY;
+
+if (!API_KEY) {
+    console.error('❌ ERREUR: Variable APIFREELLM_KEY non définie!');
+    console.error('💡 Ajoute-la dans Render ou dans .env');
+    console.error('   APIFREELLM_KEY=apf_xxxxxxxxx');
+}
+
+// ================================
+// MIDDLEWARE
+// ================================
 app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-// Route API pour chat
+// ================================
+// ROUTE CHAT API
+// ================================
 app.post('/api/chat', async (req, res) => {
     try {
         const { message, model } = req.body;
-        
+
         if (!message) {
-            return res.status(400).json({ 
+            return res.status(400).json({
                 success: false,
-                error: 'Message requis',
-                details: 'Le champ message est obligatoire dans la requête'
+                error: 'Message requis'
             });
         }
 
-        const apiKey = process.env.APIFREELLM_KEY;
-        
-        if (!apiKey) {
-            console.error('❌ ERREUR: Clé API non configurée dans les variables d\'environnement');
-            return res.status(500).json({ 
+        if (!API_KEY) {
+            return res.status(500).json({
                 success: false,
-                error: 'Clé API non configurée',
-                details: 'La variable d\'environnement APIFREELLM_KEY n\'est pas définie. Vérifiez votre configuration Render.com'
+                error: 'Clé API non configurée sur le serveur'
             });
         }
 
-        console.log('🔑 Clé API trouvée:', apiKey.substring(0, 10) + '...');
-        console.log('📤 Envoi de la requête à apifreellm...');
-        console.log('📝 Message:', message.substring(0, 50) + (message.length > 50 ? '...' : ''));
+        console.log('➡️ Requête envoyée à ApiFreeLLM');
 
-        const response = await axios.post('https://apifreellm.com/api/v1/chat', {
-            message: message,
-            model: model || 'apifreellm'
-        }, {
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`
+        // ✅ CORRECTION ICI : Bonne URL et bon format
+        const response = await axios.post(
+            'https://apifreellm.com/api/v1/chat',  // ✅ URL correcte
+            {
+                message: message,  // ✅ Paramètre "message" (pas "messages")
+                model: model || 'apifreellm'  // ✅ Modèle par défaut
             },
-            timeout: 30000
+            {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${API_KEY}`  // ✅ Bearer token
+                },
+                timeout: 30000
+            }
+        );
+
+        console.log('✅ Réponse ApiFreeLLM reçue');
+
+        // ✅ La réponse contient directement "response"
+        res.json({
+            success: true,
+            reply: response.data.response,  // ✅ Champ "response" de l'API
+            tier: response.data.tier,
+            features: response.data.features
         });
 
-        console.log('✅ Réponse reçue:', response.data);
-        res.json(response.data);
-        
     } catch (error) {
-        console.error('❌ ERREUR COMPLÈTE:', error);
-        
-        // Erreur de réponse de l'API apifreellm
-        if (error.response) {
-            console.error('📊 Status:', error.response.status);
-            console.error('📄 Data:', error.response.data);
-            console.error('📋 Headers:', error.response.headers);
-            
-            return res.status(error.response.status).json({ 
+        console.error('❌ Erreur ApiFreeLLM:', {
+            status: error.response?.status,
+            data: error.response?.data,
+            message: error.message
+        });
+
+        if (error.response?.status === 429) {
+            return res.status(429).json({
                 success: false,
-                error: 'Erreur API apifreellm',
-                status: error.response.status,
-                details: error.response.data,
-                message: getErrorMessage(error.response.status, error.response.data)
+                error: 'Limite de débit — veuillez patienter 5 secondes et réessayer.'
             });
         }
-        
-        // Erreur de connexion
-        if (error.request) {
-            console.error('🌐 Pas de réponse reçue:', error.request);
-            return res.status(503).json({ 
+
+        if (error.response?.status === 401) {
+            return res.status(401).json({
                 success: false,
-                error: 'Service indisponible',
-                details: 'Impossible de contacter l\'API apifreellm. Vérifiez votre connexion internet.'
+                error: 'Clé API invalide'
             });
         }
-        
-        // Autre erreur
-        console.error('⚠️ Erreur interne:', error.message);
-        res.status(500).json({ 
+
+        if (error.response?.status === 400) {
+            return res.status(400).json({
+                success: false,
+                error: 'Requête incorrecte - Paramètres manquants'
+            });
+        }
+
+        res.status(500).json({
             success: false,
-            error: 'Erreur interne du serveur',
+            error: 'Erreur lors de la communication avec l\'API',
             details: error.message
         });
     }
 });
 
-function getErrorMessage(status, data) {
-    switch(status) {
-        case 429:
-            return 'Limite de débit atteinte. Veuillez patienter 5 secondes avant de réessayer.';
-        case 401:
-            return 'Clé API invalide. Vérifiez votre clé API dans les paramètres.';
-        case 400:
-            return 'Requête incorrecte: ' + (data?.error || 'Paramètres manquants');
-        case 403:
-            return 'Accès interdit. Votre clé API n\'a pas les permissions nécessaires.';
-        case 404:
-            return 'Endpoint non trouvé. L\'API a peut-être changé.';
-        case 500:
-            return 'Erreur serveur chez apifreellm. Réessayez plus tard.';
-        default:
-            return `Erreur ${status}: ${JSON.stringify(data)}`;
-    }
-}
-
-// Route principale
+// ================================
+// PAGE PRINCIPALE
+// ================================
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Health check
+// ================================
+// HEALTH CHECK
+// ================================
 app.get('/health', (req, res) => {
-    res.json({ 
-        status: 'ok',
-        apiKeyConfigured: !!process.env.APIFREELLM_KEY,
+    res.json({
+        status: 'OK',
+        apiConfigured: !!API_KEY,
         timestamp: new Date().toISOString()
     });
 });
 
+// ================================
+// START SERVER
+// ================================
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Koussossou AI démarré sur le port ${PORT}`);
-    console.log(`🔧 Clé API configurée: ${process.env.APIFREELLM_KEY ? 'OUI' : 'NON'}`);
-    if (process.env.APIFREELLM_KEY) {
-        console.log(`🔑 Début de la clé: ${process.env.APIFREELLM_KEY.substring(0, 15)}...`);
+    console.log(`🚀 Serveur démarré sur le port ${PORT}`);
+    console.log(`🔑 Clé API configurée: ${API_KEY ? 'OUI' : 'NON'}`);
+    if (API_KEY) {
+        console.log(`   Clé: ${API_KEY.substring(0, 10)}...`);
     }
 });
