@@ -1,6 +1,6 @@
 import express from "express";
 import cors from "cors";
-import { puter } from "@heyputer/puter.js"; // ✅ import correct pour ESM
+import { puter } from "@heyputer/puter.js"; // ✅ import correct
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -14,7 +14,6 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 
-// Route API pour le chat
 app.post("/api/chat", async (req, res) => {
   try {
     const { message } = req.body;
@@ -23,24 +22,27 @@ app.post("/api/chat", async (req, res) => {
       return res.json({ reply: "Veuillez poser une question." });
     }
 
-    // 🔥 Utilisation stable de Puter
-    const response = await puter.ai.complete({
-      prompt: `Tu es Kousossou, assistant poli et intelligent.\nUtilisateur : ${message}\nAssistant :`,
-      model: "gpt-4o-mini"
+    // ✅ Méthode chat() compatible toutes versions
+    const response = await puter.ai.chat({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: "Tu es Kousossou, assistant poli et clair." },
+        { role: "user", content: message }
+      ]
     });
 
-    // 🔹 Fallback sécurisé
-    const reply = response?.text?.trim() || "Je n’ai pas pu générer de réponse.";
+    // 🔹 Lecture sécurisée
+    const reply = response?.message?.content || "Je n’ai pas pu générer de réponse.";
 
-    // 🔹 Logs détaillés pour Debug sur Render
-    console.log("📌 Prompt envoyé :", message);
+    // 🔹 Logs pour Render
+    console.log("📌 Message utilisateur :", message);
     console.log("📌 Réponse brute Puter :", response);
-    console.log("📌 Réponse envoyée à frontend :", reply);
+    console.log("📌 Réponse envoyée :", reply);
 
     res.json({ reply });
 
   } catch (error) {
-    console.error("❌ Erreur Puter complète :", error);
+    console.error("❌ Erreur Puter :", error);
 
     res.status(500).json({
       reply: `Erreur interne de l’assistant : ${error.message}`
