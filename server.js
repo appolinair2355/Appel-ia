@@ -12,26 +12,40 @@ const PORT = 10000;
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static("public"));
+
+// ⚠️ Sert SEULEMENT le dossier public (pas de app.get("/"))
+app.use(express.static(path.join(__dirname, "public")));
 
 app.post("/api/chat", async (req, res) => {
   try {
     const { message } = req.body;
 
+    if (!message) {
+      return res.json({ reply: "Veuillez poser une question." });
+    }
+
     const response = await puter.ai.chat({
       model: "gpt-4o-mini",
       messages: [
-        { role: "system", content: "Tu es Kousossou, un assistant intelligent, poli et clair." },
-        { role: "user", content: message }
+        {
+          role: "system",
+          content: "Tu es Kousossou, un assistant intelligent, poli et clair."
+        },
+        {
+          role: "user",
+          content: message
+        }
       ]
     });
 
     res.json({ reply: response.message.content });
-  } catch (e) {
-    res.status(500).json({ error: "Erreur IA" });
+
+  } catch (error) {
+    console.error("Erreur IA:", error);
+    res.status(500).json({ reply: "Erreur lors de la réponse de l’assistant." });
   }
 });
 
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(`🤖 Kousossou AI lancé sur le port ${PORT}`);
+  console.log(`🤖 Kousossou AI en ligne sur le port ${PORT}`);
 });
