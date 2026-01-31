@@ -1,33 +1,19 @@
-async function send() {
-  const msg = document.getElementById("msg").value;
-  const rep = document.getElementById("rep");
-  const bar = document.getElementById("progress");
-  const fill = document.getElementById("progress-fill");
+async function sendMessage() {
+  const input = document.getElementById("question");
+  const answer = document.getElementById("answer");
+  const loader = document.getElementById("loader");
 
-  if (!msg) return;
-
-  rep.innerText = "";
-  bar.style.display = "block";
-  fill.style.width = "0%";
-
-  let percent = 0;
-  const loader = setInterval(() => {
-    percent += 5;
-    fill.style.width = percent + "%";
-    if (percent >= 90) clearInterval(loader);
-  }, 100);
+  answer.innerHTML = "";
+  loader.classList.remove("hidden");
 
   const res = await fetch("/api/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message: msg })
+    body: JSON.stringify({ message: input.value })
   });
 
   const data = await res.json();
 
-  fill.style.width = "100%";
-  setTimeout(() => {
-    bar.style.display = "none";
-    rep.innerText = data.reply;
-  }, 400);
+  loader.classList.add("hidden");
+  answer.innerHTML = data.reply;
 }
